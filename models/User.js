@@ -3,7 +3,8 @@ const {Schema, model} = require("mongoose");
 const userSchema = new Schema({
     username: {
         type: String,
-        required: [true, "Debes agregar un usuario"]
+        required: [true, "Debes agregar un usuario"],
+        unique: true
     },
     profile_picture: String,
     email: {
@@ -12,7 +13,7 @@ const userSchema = new Schema({
         validate: {
             message: "El email ya tiene una cuenta asociada",
             validator: async (email) => {
-                const items = await mongoose.model("User").count({email});
+                const items = await model("User").count({email});
                 return items < 1;
             }
         }

@@ -15,7 +15,6 @@ router.post('/create', veryToken, function(req, res, next) {
         .catch(e=>{
             res.status(400).json({msg: "Algo salio mal", e});
         })
-
 });
 
 router.get('/:id', veryToken, (req, res, next) => {
@@ -72,3 +71,5 @@ router.delete("/:id", veryToken, (req, res, next) =>{
             res.status(400).json({msg:"Algo salio mal", e})
         });
 });
+
+module.exports = router;

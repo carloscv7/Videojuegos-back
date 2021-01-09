@@ -5,6 +5,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 mongoose
   .connect(process.env.DB, {
@@ -20,8 +21,16 @@ mongoose
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
+const videogameRouter = require("./routes/videogame")
 
 const app = express();
+
+app.use(
+  cors({
+      origin: ["http://localhost:3001", "https://productback.herokuapp.com/"],
+      credentials: true
+  })
+);
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -30,6 +39,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/user', usersRouter);
+app.use("/videogame", videogameRouter);
 
 module.exports = app;

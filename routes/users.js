@@ -17,14 +17,28 @@ router.post('/signup', (req, res, next) => {
   bcrypt.hash(password,10)
     .then((hashedPassword)=>{
       const user = {email, password:hashedPassword};
-
-      User.create(user)
-        .then(() => {
-          res.status(200).json({msg: "Usuario creado con éxito"});
+      let username = email.split("@")[0];
+      let usernameNum = 1;
+      User.find({username})
+        .then(users => {
+          if(users !== null){
+            usernameNum += users.length;
+          }
+          username += usernameNum;
+          user.username = username;
+          User.create(user)
+          .then(() => {
+            res.status(200).json({msg: "Usuario creado con éxito"});
+          })
+          .catch(e=>{
+            res.status(400).json({msg: "Hubo un error" , e});
+          })
         })
         .catch(e=>{
-          res.status(400).json({msg: "Hubo un error" , e});
+          console.log("Hubo un error", e);
         })
+
+      
     })
 
 });
@@ -59,6 +73,10 @@ router.post('/login', (req, res, next) => {
       res.status(400).json({msg: "Hubo un error", error});
     });
 
+});
+
+router.post("/logout",(req,res)=>{
+  res.clearCookie("token").json({msg:"Vuelve pronto"})
 });
 
 module.exports = router;
