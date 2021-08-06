@@ -19,7 +19,6 @@ mongoose
   .catch((err) => console.error("Error connecting to mongo", err));
 
 
-const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 const videogameRouter = require("./routes/videogame")
 
@@ -38,7 +37,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', indexRouter);
 app.use('/user', usersRouter);
 app.use("/videogame", videogameRouter);
 

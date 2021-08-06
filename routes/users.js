@@ -3,12 +3,14 @@ var router = express.Router();
 
 const bcrypt = require("bcrypt");
 const User = require("../models/User")
+const Videogame = require("../models/Videogame");
+
 const jwt = require("jsonwebtoken");
 
-const {clearRes} = require("../utils/auth");
+const {clearRes, veryToken} = require("../utils/auth");
 
 router.post('/signup', (req, res, next) => {
-  const {email, password, confirmPassword} = req.body;
+  const {email, username,password, confirmPassword} = req.body;
   
   if(password !== confirmPassword){
     return res.status(403).json({msg: "Las contraseñas no coinciden"});
@@ -16,30 +18,20 @@ router.post('/signup', (req, res, next) => {
 
   bcrypt.hash(password,10)
     .then((hashedPassword)=>{
-      const user = {email, password:hashedPassword};
-      let username = email.split("@")[0];
-      let usernameNum = 1;
-      User.find({username})
-        .then(users => {
-          if(users !== null){
-            usernameNum += users.length;
-          }
-          username += usernameNum;
-          user.username = username;
-          User.create(user)
-          .then(() => {
-            res.status(200).json({msg: "Usuario creado con éxito"});
-          })
-          .catch(e=>{
-            res.status(400).json({msg: "Hubo un error" , e});
-          })
+      const user = {email, password:hashedPassword, username};
+      
+        User.create(user)
+        .then(() => {
+          res.status(200).json({msg: "Usuario creado con éxito"});
         })
         .catch(e=>{
-          console.log("Hubo un error", e);
+          res.status(400).json({msg: "Hubo un error" , e});
         })
 
-      
-    })
+    }).catch(()=>{
+      res.status(500);
+    });
+
 
 });
 
@@ -60,19 +52,127 @@ router.post('/login', (req, res, next) => {
             });
 
             res.cookie("token", token, {
-              expires: new Date(Date.now + 86400000),
+              expires: new Date(Date.now + 3600000),
               secure: false,
-              httpOnly: true
+              httpOnly: false
             }).json({user:newUser, code:200});
 
           }else{
-            res.status(401).json({msg: "No es tu contraseña"});
+            res.status(401).json({msg: "Contraseña incorrecta"});
           }
         })
     }).catch(error=>{
       res.status(400).json({msg: "Hubo un error", error});
     });
 
+});
+
+router.patch("/update", veryToken, (req, res)=>{
+  const {password} = req.body;
+  User.findById(req.user._id)
+    .then(user=>{
+      if(user === null){
+        res.status(404).json({msg: "Token invalido"});
+      }
+      bcrypt.compare(password, user.password)
+        .then(match=>{
+          if(match){
+            const {email, username, newPassword} = req.body;
+            if(email !== undefined){
+              User.findByIdAndUpdate(user._id, {email}, {new:true})
+                .then(user=>{
+                  const newUser = clearRes(user.toObject());
+                  res.status(200).json({user:newUser});
+                }).catch(e=>{
+                  res.status(500).json({msg:"No se pudo modificar el correo"});
+                })
+            }else if(username !== undefined){
+              User.findByIdAndUpdate(user._id, {username}, {new:true})
+                .then(user=>{
+                  const newUser = clearRes(user.toObject());
+                  res.status(200).json({user:newUser});
+                }).catch(e=>{
+                  res.status(500).json({msg:"No se pudo modificar el usuario"});
+                })
+            }else if(newPassword !== undefined){
+              bcrypt.hash(newPassword, 10)
+                .then(hashedPassword=>{
+                  User.findByIdAndUpdate(user._id, {password: hashedPassword}, {new:true})
+                    .then(user=>{
+                      const newUser = clearRes(user.toObject());
+                      res.status(200).json({user:newUser});
+                    }).catch(e=>{
+                      res.status(500).json({msg:"No se pudo modificar la contraseña"});
+                    })
+                }).catch(e=>{
+                  console.log("Error al encriptar la contraseña ", e);
+                  res.status(500);
+                });
+            }
+          }else{
+            res.status(401).json({msg: "Contraseña incorrecta"});
+          }
+        }).catch(e=>{
+          console.log(e);
+          res.status(500).json({msg: "Error al comparar contraseñas"});
+        });
+    }).catch(e=>{
+      res.status(404).json({msg: "Token invalido"});
+    });
+});
+
+router.get("/verifyToken", veryToken, (req, res)=>{
+  res.status(200).json({msg: "La sesion esta activa"});
+});
+
+router.delete("/deleteAccount", veryToken, (req, res)=>{
+  const {password} = req.body;
+  
+  User.findById(req.user._id)
+    .then(user =>{
+      if(user === null){
+        res.status(404).json({msg: "Token invalido"});
+      }
+      console.log(password + " " + user.password);
+      bcrypt.compare(password, user.password)
+        .then(match=>{
+          if(match){
+            Videogame.find({_owner: req.user._id})
+              .then(videogames=>{
+                let promiseArr = [];
+                for(let i = 0; i < videogames.length; i++){
+                  promiseArr[i] = Videogame.findByIdAndDelete(videogames[i]._id);
+                  promiseArr[i]
+                    .catch(e=>{
+                      console.log(e)
+                      res.status(500).json({msg: "No se pudo borrar un videojuego", e});
+                    });
+                }
+                Promise.all(promiseArr)
+                  .then(()=>{
+                    User.findByIdAndDelete(user._id)
+                      .then(()=>{
+                        res.status(200).json({msg: "Usuario borrado con exito"});
+                      }).catch(e=>{
+                        console.log(e);
+                        res.status(500).json({msg: "No se pudo borrar el usuario", e});
+                      });
+                  });
+
+              }).catch(e=>{
+                console.log(e);
+                res.status(500).json({msg: "Error al encontrar videojuegos", e});
+              })
+          }else{
+            res.status(401).json({msg: "Contraseña incorrecta"});
+          }
+        }).catch(e=>{
+          console.log(e);
+          res.status(500).json({msg: "Hubo un error al validar la contraseña",e});
+        });
+    }).catch(e=>{
+      res.status(400).json({msg: "Hubo un error", e});
+    });
 });
 
 router.post("/logout",(req,res)=>{
